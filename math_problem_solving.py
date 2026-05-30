@@ -1,62 +1,71 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
-# --- 1. 准备数据 ---
-x = np.array([0.5, 1.1, 1.7, 2.1, 2.5, 2.9, 3.3, 3.7, 4.2, 4.9, 5.3, 6.0])
-y = np.array([1.6, 2.4, 3.8, 4.3, 4.7, 4.8, 5.5, 6.1, 6.3, 7.1, 7.4, 8.2])
-#无事发生
+def solve_integral_problem():
+    # 定义被积函数
+    f = lambda x: np.sqrt(x + 1.5)
+    exact_value = 2.399529
 
-# --- 2. 数据中心化 ---
-x_mean = np.mean(x)
-y_mean = np.mean(y)
+    print(f"被积函数: f(x) = sqrt(x + 1.5)")
+    print(f"积分区间: [-1, 1]")
+    print(f"积分准确值: {exact_value}\n")
 
-x_centered = x - x_mean
-y_centered = y - y_mean
 
-# --- 3. 构建增广矩阵 M ---
-M = np.column_stack((x_centered, y_centered))
+    print("1. 牛顿-柯特斯求积公式 (Newton-Cotes)")
 
-# --- 4. SVD 分解 ---
-U, S, Vt = np.linalg.svd(M)
+    # n=2: 梯形公式 (Trapezoidal Rule)
+    # 节点: -1, 1; 权重: [1, 1] * (b-a)/2
+    nc_n2 = (1 - (-1)) / 2 * (f(-1) + f(1))
+    print(f"[n=2] 结果: {nc_n2:.6f}, 误差: {abs(nc_n2 - exact_value):.6e}")
 
-# --- 5. 提取解向量 ---
-v_min = Vt[-1, :]  # 这是一个包含 2 个元素的向量 [a, b]
+    # n=3: 辛普森公式 (Simpson's Rule)
+    # 节点: -1, 0, 1; 权重: [1, 4, 1] * (b-a)/6
+    nc_n3 = (2 / 6) * (f(-1) + 4 * f(0) + f(1))
+    print(f"[n=3] 结果: {nc_n3:.6f}, 误差: {abs(nc_n3 - exact_value):.6e}")
 
-print(f"SVD 得到的法向量 (a, b): {v_min}")
+    # n=4: 辛普森 3/8 公式 (Simpson's 3/8 Rule)
+    # 节点: -1, -1/3, 1/3, 1; 权重: [1, 3, 3, 1] * (b-a)*3/8 ... 注意这里分母处理
+    # 标准形式: 3h/8 * (y0 + 3y1 + 3y2 + y3), h=(b-a)/3
+    nodes_4 = np.linspace(-1, 1, 4)
+    weights_4 = np.array([1, 3, 3, 1]) * (3 * ((1 - (-1))/3) / 8)
+    nc_n4 = sum(w * f(x) for x, w in zip(nodes_4, weights_4))
+    print(f"[n=4] 结果: {nc_n4:.6f}, 误差: {abs(nc_n4 - exact_value):.6e}")
 
-# --- 6. 计算直线参数 ---
-k_tls = -v_min[0] / v_min[1]
-b_tls = y_mean - k_tls * x_mean
+    # n=5: 布尔公式 (Boole's Rule)
+    # 节点: -1, -0.5, 0, 0.5, 1; 权重: [7, 32, 12, 32, 7] * (b-a)*2/45
+    nodes_5 = np.linspace(-1, 1, 5)
+    weights_5 = np.array([7, 32, 12, 32, 7]) * (2 * (1 - (-1)) / 45)
+    nc_n5 = sum(w * f(x) for x, w in zip(nodes_5, weights_5))
+    print(f"[n=5] 结果: {nc_n5:.6f}, 误差: {abs(nc_n5 - exact_value):.6e}")
 
-print(f"完全最小二乘法拟合结果: y = {k_tls:.4f}x + {b_tls:.4f}")
 
-# --- 7. 计算残差的 2-范数 (垂直距离) ---
-A_line = k_tls
-B_line = -1
-C_line = b_tls
+    # ==========================================
+    # 2. 高斯-勒让德求积公式 (Gauss-Legendre)
+    # 使用 numpy 自动生成最优节点和权重
+    # ==========================================
+    print("\n" )
+    print("2. 高斯-勒让德求积公式 (Gauss-Legendre)")
 
-# 计算所有点的距离
-distances = np.abs(A_line * x + B_line * y + C_line) / np.sqrt(A_line**2 + B_line**2)
-norm_2 = np.linalg.norm(distances)
 
-print(f"残差的 2-范数 (正交距离和): {norm_2:.4f}")
+    # n=2
+    nodes_2, weights_2 = np.polynomial.legendre.leggauss(2)
+    gl_n2 = sum(w * f(x) for x, w in zip(nodes_2, weights_2))
+    print(f"[n=2] 结果: {gl_n2:.6f}, 误差: {abs(gl_n2 - exact_value):.6e}")
 
-# --- 8. 绘图验证 ---
-plt.figure(figsize=(10, 6))
-plt.scatter(x, y, color='red', label='Data Points')
+    # n=3
+    nodes_3, weights_3 = np.polynomial.legendre.leggauss(3)
+    gl_n3 = sum(w * f(x) for x, w in zip(nodes_3, weights_3))
+    print(f"[n=3] 结果: {gl_n3:.6f}, 误差: {abs(gl_n3 - exact_value):.6e}")
 
-# 绘制 TLS 拟合直线
-x_line = np.linspace(0, 7, 100)
-y_line = k_tls * x_line + b_tls
-plt.plot(x_line, y_line, color='green', linewidth=2, label=f'TLS Fit (SVD)')
+    # n=4
+    nodes_4_g, weights_4_g = np.polynomial.legendre.leggauss(4)
+    gl_n4 = sum(w * f(x) for x, w in zip(nodes_4_g, weights_4_g))
+    print(f"[n=4] 结果: {gl_n4:.6f}, 误差: {abs(gl_n4 - exact_value):.6e}")
 
-# 绘制普通最小二乘 (OLS) 做对比
-A_ols = np.column_stack((x, np.ones(len(x))))
-sol_ols = np.linalg.lstsq(A_ols, y, rcond=None)[0]
-y_ols = sol_ols[0] * x_line + sol_ols[1]
-plt.plot(x_line, y_ols, color='blue', linestyle='--', label=f'OLS Fit (Vertical)')
+    # n=5
+    nodes_5_g, weights_5_g = np.polynomial.legendre.leggauss(5)
+    gl_n5 = sum(w * f(x) for x, w in zip(nodes_5_g, weights_5_g))
+    print(f"[n=5] 结果: {gl_n5:.6f}, 误差: {abs(gl_n5 - exact_value):.6e}")
 
-plt.legend()
-plt.grid(True)
-plt.title(f'TLS via SVD: y={k_tls:.2f}x+{b_tls:.2f}')
-plt.show()
+
+if __name__ == "__main__":
+    solve_integral_problem()
